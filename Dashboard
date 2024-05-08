@@ -4,14 +4,15 @@ from dash.exceptions import PreventUpdate
 import pickle
 import pandas as pd
 import tensorflow as tf
-
+import numpy as np
+from joblib import load
 
 
 
 app = dash.Dash(__name__)
 
 model = tf.keras.models.load_model('modelo_opt.h5')
-
+preprocessor = load('preprocessor.joblib')
 # Estilos CSS comunes y para secciones
 styles = {
     'container': {
@@ -130,12 +131,18 @@ def evaluate_credit(n_clicks, *args):
 
     try:
         input_df = pd.DataFrame([{
-            'LIMIT_BAL': args[-5], 'EDUCATION': args[-3], 'MARRIAGE': args[-2],
-            **{f'PAY_{i}': args[i] for i in range(0, 6)},
-            **{f'BILL_AMT{i+1}': args[i+6] for i in range(6)},
-            **{f'PAY_AMT{i+12}': args[i+12] for i in range(6)}
+            'LIMIT_BAL': args[-5], 'EDUCATION': args[-2], 'MARRIAGE': args[-1],
+            **{f'PAY_{i}': args[i] for i in range(7)},
+            **{f'BILL_AMT{i}': args[i+6] for i in range(1,7)},
+            **{f'PAY_AMT{i}': args[i+12] for i in range(1,7)}
         }])
-        prediction = model.predict(input_df)
+
+        input_df_norm = preprocessor.transform(input_df)
+        prediction = model.predict(input_df_norm)
+        threshold = 0.50
+
+        prediction = np.where(prediction >= threshold, 1, 0)
+        
         return "Crédito Aprobado" if prediction == 1 else "Crédito Denegado"
     except Exception as e:
         return f"Error al evaluar la solicitud: {e}"
